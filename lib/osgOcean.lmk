@@ -1,0 +1,33 @@
+require "lmkOSG"
+
+lmkOSG.set_name ("osgOcean", {DMZ_USE_FFTW3 = true})
+lmk.set_type "shared"
+
+lmk.add_files ({
+   "osgOcean/DynamicShader",
+   "osgOcean/Export",
+   "osgOcean/FFTOceanSurface",
+   "osgOcean/FFTSimulation",
+   "osgOcean/MipmapGeometry",
+   "osgOcean/OceanScene",
+   "osgOcean/OceanTechnique",
+   "osgOcean/OceanTile",}, {src = "h",})
+
+lmk.add_files {
+   "DynamicShader.cpp",
+   "FFTOceanSurface.cpp",
+   "FFTSimulation.cpp",
+   "MipmapGeometry.cpp",
+   "OceanScene.cpp",
+   "OceanTechnique.cpp",
+   "OceanTile.cpp",
+}
+
+lmkOSG.add_libs {"osgUtil", "osgText", "osgDB", "osgUtil", "osg", "OpenThreads",}
+
+lmk.add_vars {
+   localIncludes = "$(lmk.includePathFlag)./ $(lmk.includePathFlag)$(FFTW3_INCLUDE_PATH)",
+   localLibPaths = "$(lmk.libPathFlag)$(FFTW3_LIB_PATH)",
+   localLibs = "$(lmk.libPrefix)fftw3f",
+}
+

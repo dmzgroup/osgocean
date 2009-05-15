@@ -1,0 +1,53 @@
+K 25
+svn:wc:ra_dav:version-url
+V 39
+/svn/!svn/ver/15/trunk/include/osgOcean
+END
+MipmapGeometry
+K 25
+svn:wc:ra_dav:version-url
+V 53
+/svn/!svn/ver/5/trunk/include/osgOcean/MipmapGeometry
+END
+Export
+K 25
+svn:wc:ra_dav:version-url
+V 45
+/svn/!svn/ver/5/trunk/include/osgOcean/Export
+END
+OceanScene
+K 25
+svn:wc:ra_dav:version-url
+V 49
+/svn/!svn/ver/5/trunk/include/osgOcean/OceanScene
+END
+OceanTile
+K 25
+svn:wc:ra_dav:version-url
+V 48
+/svn/!svn/ver/5/trunk/include/osgOcean/OceanTile
+END
+FFTSimulation
+K 25
+svn:wc:ra_dav:version-url
+V 52
+/svn/!svn/ver/5/trunk/include/osgOcean/FFTSimulation
+END
+DynamicShader
+K 25
+svn:wc:ra_dav:version-url
+V 52
+/svn/!svn/ver/5/trunk/include/osgOcean/DynamicShader
+END
+OceanTechnique
+K 25
+svn:wc:ra_dav:version-url
+V 53
+/svn/!svn/ver/5/trunk/include/osgOcean/OceanTechnique
+END
+FFTOceanSurface
+K 25
+svn:wc:ra_dav:version-url
+V 55
+/svn/!svn/ver/15/trunk/include/osgOcean/FFTOceanSurface
+END

@@ -1,0 +1,28 @@
+require "lmkOSG"
+
+lmkOSG.set_name ("osgOceanApp", {DMZ_USE_FFTW3 = true})
+lmk.set_type "exe"
+
+lmk.add_files {
+   "SkyDome.cpp",
+   "SphereSegment.cpp",
+   "application.cpp",
+}
+
+lmk.add_libs {"osgOcean"}
+
+lmkOSG.add_libs {
+   "osgViewer",
+   "osgGA",
+   "osgText",
+   "osgDB",
+   "osgUtil",
+   "osg",
+   "OpenThreads",
+}
+
+lmk.add_vars {
+   localIncludes = "$(lmk.includePathFlag)$(lmk.projectRoot)/include " ..
+      "$(lmk.includePathFlag)$(FFTW3_INCLUDE_PATH)",
+}
+
