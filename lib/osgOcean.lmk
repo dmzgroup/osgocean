@@ -4,30 +4,46 @@ lmkOSG.set_name ("osgOcean", {DMZ_USE_FFTW3 = true})
 lmk.set_type "shared"
 
 lmk.add_files ({
+   "osgOcean/DistortionSurface",
    "osgOcean/DynamicShader",
    "osgOcean/Export",
    "osgOcean/FFTOceanSurface",
    "osgOcean/FFTSimulation",
+   "osgOcean/GodRayBlendSurface",
+   "osgOcean/GodRays",
    "osgOcean/MipmapGeometry",
    "osgOcean/OceanScene",
    "osgOcean/OceanTechnique",
-   "osgOcean/OceanTile",}, {src = "h",})
+   "osgOcean/OceanTile",
+   "osgOcean/ScreenAlignedQuad",
+   "osgOcean/ShaderManager",
+   "osgOcean/SiltEffect",
+   "osgOcean/WaterTrochoids",
+}, {src = "h",})
 
 lmk.add_files {
+   "DistortionSurface.cpp",
    "DynamicShader.cpp",
    "FFTOceanSurface.cpp",
    "FFTSimulation.cpp",
+   "GodRayBlendSurface.cpp",
+   "GodRays.cpp",
    "MipmapGeometry.cpp",
    "OceanScene.cpp",
    "OceanTechnique.cpp",
    "OceanTile.cpp",
+   "ScreenAlignedQuad.cpp",
+   "ShaderManager.cpp",
+   "SiltEffect.cpp",
+   "WaterTrochoids.cpp",
 }
 
-lmkOSG.add_libs {"osgUtil", "osgText", "osgDB", "osgUtil", "osg", "OpenThreads",}
+lmkOSG.add_libs {"osgGA", "osgUtil", "osgText", "osgDB", "osgUtil", "osg", "OpenThreads",}
 
 lmk.add_vars {
    localIncludes = "$(lmk.includePathFlag)./ $(lmk.includePathFlag)$(FFTW3_INCLUDE_PATH)",
    localLibPaths = "$(lmk.libPathFlag)$(FFTW3_LIB_PATH)",
-   localLibs = "$(lmk.libPrefix)fftw3f",
+   localLibs = "$(lmk.libPrefix)fftw3f -framework OpenGL",
+   localDefines = "-DUSE_FFTW3F",
 }
 
