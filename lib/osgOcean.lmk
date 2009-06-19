@@ -1,4 +1,5 @@
 require "lmkOSG"
+require "lmkOpenGL"
 
 lmkOSG.set_name ("osgOcean", {DMZ_USE_FFTW3 = true})
 lmk.set_type "shared"
@@ -43,7 +44,17 @@ lmkOSG.add_libs {"osgGA", "osgUtil", "osgText", "osgDB", "osgUtil", "osg", "Open
 lmk.add_vars {
    localIncludes = "$(lmk.includePathFlag)./ $(lmk.includePathFlag)$(FFTW3_INCLUDE_PATH)",
    localLibPaths = "$(lmk.libPathFlag)$(FFTW3_LIB_PATH)",
-   localLibs = "$(lmk.libPrefix)fftw3f -framework OpenGL",
-   localDefines = "-DUSE_FFTW3F",
 }
+
+lmk.add_vars ({
+   localLibs = "$(lmk.libPrefix)fftw3",
+   localDefines = "-DUSE_FFTW3",
+}, { win32=false, })
+
+lmk.add_vars ({
+   localLibs = "$(lmk.libPrefix)libfftw3-3.lib",
+   localDefines = "/DUSE_FFTW3 /DOSGOCEAN_LIBRARY",
+}, { win32=true, })
+
+lmkOpenGL.setup ()
 
