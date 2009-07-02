@@ -17,8 +17,47 @@
 
 #include <osgOcean/ShaderManager>
 #include <osgDB/ReadFile>
+#include <osgDB/fileutils>
+#include <osg/Version>
 
 using namespace osgOcean;
+
+
+osg::Shader* readShader(const std::string& filename)
+{
+    // The .vert and .frag extensions were added to the GLSL plugin in OSG 
+    // 2.7.3, and the automatic setting of shader type depending on the 
+    // extension was added in OSG 2.9.1. The code below lets us use OSG
+    // 2.6 and still get the same behavior.
+#if OPENSCENEGRAPH_MAJOR_VERSION > 2 || \
+    (OPENSCENEGRAPH_MAJOR_VERSION == 2 && OPENSCENEGRAPH_MINOR_VERSION > 9) || \
+    (OPENSCENEGRAPH_MAJOR_VERSION == 2 && OPENSCENEGRAPH_MINOR_VERSION == 9 && OPENSCENEGRAPH_PATCH_VERSION >= 1)
+
+    // This will search the registry's file path.
+    return osgDB::readShaderFile(filename);
+
+#else
+
+    // Determine shader type from the extension
+    osg::Shader::Type type = osg::Shader::UNDEFINED;
+    if (filename.find("vert") == filename.length() - 4)
+        type = osg::Shader::VERTEX;
+    else if (filename.find("frag") == filename.length() - 4)
+        type = osg::Shader::FRAGMENT;
+    else
+        return 0;
+
+    // Find the shader file in the osgDB data path list.
+    std::string fullpath = osgDB::findDataFile(filename);
+    if (fullpath.empty())
+        return 0;
+
+    // Read the shader file.
+    osg::Shader* shader = osg::Shader::readShaderFile(type, fullpath);
+    return shader;
+
+#endif
+}
 
 ShaderManager::ShaderManager()
 {
@@ -53,17 +92,17 @@ osg::Program* ShaderManager::createProgram( const std::string& name,
 {
     osg::ref_ptr<osg::Shader> vShader = 0;
     osg::ref_ptr<osg::Shader> fShader = 0;
-    
-	 if (loadFromFiles)
+
+    if (loadFromFiles)
     {
-		  vShader = osgDB::readShaderFile(osg::Shader::VERTEX, vertexSrc);
+        vShader = readShader(vertexSrc);
         if (!vShader)
         {
             osg::notify(osg::WARN) << "Could not read shader from file " << vertexSrc << std::endl;
             return NULL;
         }
 
-    	  fShader = osgDB::readShaderFile(osg::Shader::FRAGMENT, fragmentSrc);
+        fShader = readShader(fragmentSrc);
         if (!fShader)
         {
             osg::notify(osg::WARN) << "Could not read shader from file " << fragmentSrc << std::endl;
@@ -72,28 +111,46 @@ osg::Program* ShaderManager::createProgram( const std::string& name,
     }
     else
     {
-        vShader = new osg::Shader( osg::Shader::VERTEX, vertexSrc );
-        fShader = new osg::Shader( osg::Shader::FRAGMENT, fragmentSrc );
+        if (!vertexSrc.empty())
+        {
+            vShader = new osg::Shader( osg::Shader::VERTEX, vertexSrc );
+        }
+        if (!fragmentSrc.empty())
+        {
+            fShader = new osg::Shader( osg::Shader::FRAGMENT, fragmentSrc );
+        }
     }
-
-    std::string globalDefinitionsList = buildGlobalDefinitionsList();
-    vShader->setShaderSource(globalDefinitionsList + vShader->getShaderSource());
-    fShader->setShaderSource(globalDefinitionsList + fShader->getShaderSource());
-
-    vShader->setName(name+"_vertex_shader");
-    fShader->setName(name+"_fragment_shader");
 
     osg::Program* program = new osg::Program;
     program->setName(name);
-    program->addShader( vShader.get() );
-    program->addShader( fShader.get() );
+
+    std::string globalDefinitionsList = buildGlobalDefinitionsList(name);
+    if (vShader)
+    {
+        vShader->setShaderSource(globalDefinitionsList + vShader->getShaderSource());
+        vShader->setName(name+"_vertex_shader");
+        program->addShader( vShader.get() );
+    }
+    if (fShader)
+    {
+        fShader->setShaderSource(globalDefinitionsList + fShader->getShaderSource());
+        fShader->setName(name+"_fragment_shader");
+        program->addShader( fShader.get() );
+    }
 
     return program;
 }
 
-std::string ShaderManager::buildGlobalDefinitionsList()
+std::string ShaderManager::buildGlobalDefinitionsList(const std::string& name)
 {
     std::string list;
+
+    if (!name.empty())
+    {
+        list += "// " + name + "\n";
+    }
+   // list += "#version 120\n";
+
     for (GlobalDefinitions::const_iterator it = _globalDefinitions.begin();
          it != _globalDefinitions.end(); ++it)
     {

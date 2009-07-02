@@ -29,6 +29,7 @@ FFTOceanSurface::FFTOceanSurface( unsigned int FFTGridSize,
                                   const osg::Vec2f& windDirection,
                                   float windSpeed,
                                   float depth,
+                                  float reflectionDamping,
                                   float waveScale,
                                   bool isChoppy,
                                   float choppyFactor,
@@ -50,6 +51,7 @@ FFTOceanSurface::FFTOceanSurface( unsigned int FFTGridSize,
     _waveScale      ( waveScale ),
     _noiseWaveScale ( waveScale ),
     _depth          ( depth ),
+    _reflDampFactor ( reflectionDamping ),
     _cycleTime      ( animLoopTime ),
     _choppyFactor   ( choppyFactor ),
     _isChoppy       ( isChoppy ),
@@ -209,7 +211,7 @@ osg::ref_ptr<osg::Texture2D> FFTOceanSurface::createNoiseMap(unsigned int size,
 {
     osg::ref_ptr<osg::FloatArray> heights = new osg::FloatArray;
 
-    FFTSimulation noiseFFT(size, windDir, windSpeed, waveScale, tileResolution,10.f);
+    FFTSimulation noiseFFT(size, windDir, windSpeed, _depth, _reflDampFactor, waveScale, tileResolution, 10.f);
     noiseFFT.setTime(0.f);
     noiseFFT.computeHeights(heights.get());
         
@@ -224,7 +226,7 @@ void FFTOceanSurface::computeSea( unsigned int totalFrames )
     osg::notify(osg::INFO) << "Mipmap Levels: " << _numLevels << std::endl;
     osg::notify(osg::INFO) << "Highest Resolution: " << _tileSize << std::endl;
 
-    FFTSimulation FFTSim( _tileSize, _windDirection, _windSpeed, _waveScale, _tileResolution, _cycleTime );
+    FFTSimulation FFTSim( _tileSize, _windDirection, _windSpeed, _depth, _reflDampFactor, _waveScale, _tileResolution, _cycleTime );
 
 	 // clear previous mipmaps (if any)
 	 _mipmapData.clear();
@@ -421,21 +423,25 @@ void FFTOceanSurface::update( unsigned int frame, const double& dt, const osg::V
     else if(_isStateDirty)
         initStateSet();
 
-    static double time = 0.0;
-    time+=(dt*0.0008);
-
     getStateSet()->getUniform("osgOcean_EyePosition")->set(eye);
-    getStateSet()->getUniform("osgOcean_NoiseCoords0")->set( computeNoiseCoords( 32.f, osg::Vec2f( 2.f, 4.f), 2.f, time ) );
-    getStateSet()->getUniform("osgOcean_NoiseCoords1")->set( computeNoiseCoords( 8.f,  osg::Vec2f(-4.f, 2.f), 1.f, time ) );
-    
-    if( updateMipmaps( eye, frame ) )
+
+    if (_isAnimating)
     {
-        computeVertices( frame );
-        computePrimitives();
-    }
-    else if( frame != _oldFrame )
-    {
-        computeVertices( frame );
+        static double time = 0.0;
+        time+=(dt*0.0008);
+
+        getStateSet()->getUniform("osgOcean_NoiseCoords0")->set( computeNoiseCoords( 32.f, osg::Vec2f( 2.f, 4.f), 2.f, time ) );
+        getStateSet()->getUniform("osgOcean_NoiseCoords1")->set( computeNoiseCoords( 8.f,  osg::Vec2f(-4.f, 2.f), 1.f, time ) );
+        
+        if( updateMipmaps( eye, frame ) )
+        {
+            computeVertices( frame );
+            computePrimitives();
+        }
+        else if( frame != _oldFrame )
+        {
+            computeVertices( frame );
+        }
     }
 
     _oldFrame = frame;

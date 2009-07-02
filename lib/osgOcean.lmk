@@ -16,6 +16,7 @@ lmk.add_files ({
    "osgOcean/OceanScene",
    "osgOcean/OceanTechnique",
    "osgOcean/OceanTile",
+   "osgOcean/RandUtils",
    "osgOcean/ScreenAlignedQuad",
    "osgOcean/ShaderManager",
    "osgOcean/SiltEffect",
