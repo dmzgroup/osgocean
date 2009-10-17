@@ -303,6 +303,10 @@ namespace osgOcean
             _isStateDirty = true;
         }
 
+        inline osg::Vec4f getLightColor() const{
+            return _lightColor;
+        }
+
         inline void enableCrestFoam( bool enable ){
             _useCrestFoam = enable;
             _isStateDirty = true;
@@ -340,9 +344,15 @@ namespace osgOcean
             return _isEndless;
         }
 
+        /// Returns the average height over the whole surface (in local space)
         inline float getSurfaceHeight( void ) const {
             return _averageHeight;
         }
+
+        /// Returns the height at the given point (in local space). If the 
+        /// address of a Vec3f is passed in the normal argument, the normal at
+        /// that position will be calculated and stored in it.
+        float getSurfaceHeightAt(float x, float y, osg::Vec3f* normal = NULL);
 
         /**
         * Enable/Disable choppy wave geometry.
@@ -408,6 +418,15 @@ namespace osgOcean
 
         inline float getWindSpeed() const{
             return _windSpeed;
+        }
+
+        inline void setDepth(const float depth, bool dirty = true){
+            _depth = depth;
+            if (dirty) _isDirty = true;
+        }
+
+        inline float getDepth() const{
+            return _depth;
         }
 
         /**

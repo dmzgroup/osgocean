@@ -45,7 +45,6 @@
 #include <osgOcean/ShaderManager>
 
 #include "SkyDome.h"
-#include "Cylinder.h"
 
 #define USE_CUSTOM_SHADER
 
@@ -132,42 +131,64 @@ public:
 //               Camera Track Callback
 // ----------------------------------------------------
 
-class CameraTrackDataType: public osg::Referenced
-{
-private:
-    osg::Vec3f _eye;
-    osg::PositionAttitudeTransform& _pat;
-
-public:
-    CameraTrackDataType( osg::PositionAttitudeTransform& pat ):_pat(pat){};
-
-    inline void setEye( const osg::Vec3f& eye ){ _eye = eye; }
-
-    inline void update(void){
-        _pat.setPosition( osg::Vec3f(_eye.x(), _eye.y(), _pat.getPosition().z() ) );
-    }
-};
-
 class CameraTrackCallback: public osg::NodeCallback
 {
 public:
     virtual void operator()(osg::Node* node, osg::NodeVisitor* nv)
     {
-        osg::ref_ptr<CameraTrackDataType> data = dynamic_cast<CameraTrackDataType*> ( node->getUserData() );
-
         if( nv->getVisitorType() == osg::NodeVisitor::CULL_VISITOR )
         {
             osgUtil::CullVisitor* cv = static_cast<osgUtil::CullVisitor*>(nv);
-            osg::Vec3f eye,centre,up;
-            cv->getCurrentCamera()->getViewMatrixAsLookAt(eye,centre,up);
-            data->setEye(eye);
-        }
-        else if(nv->getVisitorType() == osg::NodeVisitor::UPDATE_VISITOR ){
-            data->update();
+            osg::Vec3f centre,up,eye;
+            // get MAIN camera eye,centre,up
+            cv->getRenderStage()->getCamera()->getViewMatrixAsLookAt(eye,centre,up);
+            // update position
+            osg::MatrixTransform* mt = static_cast<osg::MatrixTransform*>(node);
+            mt->setMatrix( osg::Matrix::translate( eye.x(), eye.y(), mt->getMatrix().getTrans().z() ) );
         }
 
         traverse(node, nv); 
     }
+};
+
+
+class BoatPositionCallback : public osg::NodeCallback
+{
+public: 
+    BoatPositionCallback(osgOcean::OceanScene* oceanScene)
+        : _oceanScene(oceanScene) {}
+
+    virtual void operator()(osg::Node* node, osg::NodeVisitor* nv)
+    {
+        if(nv->getVisitorType() == osg::NodeVisitor::UPDATE_VISITOR ){
+            osg::MatrixTransform* mt = dynamic_cast<osg::MatrixTransform*>(node);
+            if (!mt || !_oceanScene.valid()) return;
+
+            osg::Matrix mat = osg::computeLocalToWorld(nv->getNodePath());
+            osg::Vec3d pos = mat.getTrans();
+
+            osg::Vec3f normal;
+            // Get the ocean surface height at the object's position, note
+            // that this only considers one point on the object (the object's
+            // geometric center) and not the whole object.
+            float height = _oceanScene->getOceanSurfaceHeightAt(pos.x(), pos.y(), &normal);
+
+            mat.makeTranslate(osg::Vec3f(pos.x(), pos.y(), height));
+
+            osg::Matrix rot;
+            rot.makeIdentity();
+            rot.makeRotate( normal.x(), osg::Vec3f(1.0f, 0.0f, 0.0f), 
+                            normal.y(), osg::Vec3f(0.0f, 1.0f, 0.0f),
+                            (1.0f-normal.z()), osg::Vec3f(0.0f, 0.0f, 1.0f));
+
+            mat = rot*mat;
+            mt->setMatrix(mat);
+        }
+
+        traverse(node, nv); 
+    }
+
+    osg::observer_ptr<osgOcean::OceanScene> _oceanScene;
 };
 
 // ----------------------------------------------------
@@ -221,7 +242,6 @@ private:
     osg::ref_ptr<osgOcean::FFTOceanSurface> _oceanSurface;
     osg::ref_ptr<osg::TextureCubeMap> _cubemap;
     osg::ref_ptr<SkyDome> _skyDome;
-    osg::ref_ptr<Cylinder> _oceanCylinder;
         
     std::vector<std::string> _cubemapDirs;
     std::vector<osg::Vec4f>  _lightColors;
@@ -313,6 +333,8 @@ public:
                 _oceanSurface->setFoamTopHeight( 3.0f );
                 _oceanSurface->enableCrestFoam( true );
                 _oceanSurface->setLightColor( _lightColors[_sceneType] );
+                // Make the ocean surface track with the main camera position, giving the illusion
+                // of an endless ocean surface.
                 _oceanSurface->enableEndlessOcean(true);
             }
 
@@ -326,6 +348,12 @@ public:
                 _oceanScene->setLightID(0);
                 _oceanScene->enableReflections(true);
                 _oceanScene->enableRefractions(true);
+
+                // Set the size of _oceanCylinder which follows the camera underwater. 
+                // This cylinder prevents the clear from being visible past the far plane 
+                // instead it will be the fog color.
+                // The size of the cylinder should be changed according the size of the ocean surface.
+                _oceanScene->setCylinderSize( 1900.f, 4000.f );
                 
                 _oceanScene->setAboveWaterFog(0.0012f, _fogColors[_sceneType] );
                 _oceanScene->setUnderwaterFog(0.002f,  _waterFogColors[_sceneType] );
@@ -336,6 +364,7 @@ public:
                 _oceanScene->enableGodRays(true);
                 _oceanScene->enableSilt(true);
                 _oceanScene->enableUnderwaterDOF(true);
+                _oceanScene->enableDistortion(true);
                 _oceanScene->enableGlare(true);
                 _oceanScene->setGlareAttenuation(0.8f);
 
@@ -344,31 +373,15 @@ public:
                 _skyDome = new SkyDome( 1900.f, 16, 16, _cubemap.get() );
                 _skyDome->setNodeMask( _oceanScene->getReflectedSceneMask() | _oceanScene->getNormalSceneMask() );
 
-                _oceanCylinder = new Cylinder(1900.f, 999.8f, 16, false, true );
-                _oceanCylinder->setColor( _waterFogColors[_sceneType] );
-                _oceanCylinder->getOrCreateStateSet()->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
-                _oceanCylinder->getOrCreateStateSet()->setMode(GL_FOG, osg::StateAttribute::OFF);
-                
-                osg::Geode* oceanCylinderGeode = new osg::Geode;
-                oceanCylinderGeode->addDrawable(_oceanCylinder.get());
-                oceanCylinderGeode->setNodeMask( _oceanScene->getNormalSceneMask() );
-
-                osg::PositionAttitudeTransform* cylinderPat = new osg::PositionAttitudeTransform;
-                cylinderPat->setPosition( osg::Vec3f(0.f, 0.f, -1000.f) );
-                cylinderPat->addChild( oceanCylinderGeode );
-
                 // add a pat to track the camera
-                osg::PositionAttitudeTransform* pat = new osg::PositionAttitudeTransform;
-                pat->setDataVariance( osg::Object::DYNAMIC );
-                pat->setPosition( osg::Vec3f(0.f, 0.f, 0.f) );
-                pat->setUserData( new CameraTrackDataType(*pat) );
-                pat->setUpdateCallback( new CameraTrackCallback );
-                pat->setCullCallback( new CameraTrackCallback );
+                osg::MatrixTransform* transform = new osg::MatrixTransform;
+                transform->setDataVariance( osg::Object::DYNAMIC );
+                transform->setMatrix( osg::Matrixf::translate( osg::Vec3f(0.f, 0.f, 0.f) ));
+                transform->setCullCallback( new CameraTrackCallback );
                 
-                pat->addChild( _skyDome.get() );
-                pat->addChild( cylinderPat );
+                transform->addChild( _skyDome.get() );
 
-                _oceanScene->addChild( pat );
+                _oceanScene->addChild( transform );
 
                 {
                     // Create and add fake texture for use with nodes without any texture
@@ -462,8 +475,6 @@ public:
 
         _light->setPosition( osg::Vec4f(_sunPositions[_sceneType],1.f) );
         _light->setDiffuse( _sunDiffuse[_sceneType] ) ;
-
-        _oceanCylinder->setColor( _waterFogColors[_sceneType] );
 
         if(_islandSwitch.valid() )
         {
@@ -682,6 +693,9 @@ int main(int argc, char *argv[])
     arguments.getApplicationUsage()->addCommandLineOption("--isNotChoppy","Set the waves not choppy (by default they are).");
     arguments.getApplicationUsage()->addCommandLineOption("--choppyFactor <factor>","How choppy the waves are. Default: 2.5");
     arguments.getApplicationUsage()->addCommandLineOption("--crestFoamHeight <height>","How high the waves need to be before foam forms on the crest. Default: 2.2 ");
+    arguments.getApplicationUsage()->addCommandLineOption("--oceanSurfaceHeight <z>","Z position of the ocean surface in world coordinates. Default: 0.0");
+    arguments.getApplicationUsage()->addCommandLineOption("--testCollision","Test ocean surface collision detection by making a boat float on its surface.");
+    arguments.getApplicationUsage()->addCommandLineOption("--disableShaders","Disable use of shaders for the whole application. Also disables most visual effects as they depend on shaders.");
 
     unsigned int helpType = 0;
     if ((helpType = arguments.readHelpType()))
@@ -724,6 +738,15 @@ int main(int argc, char *argv[])
     float crestFoamHeight = 2.2f;
     while (arguments.read("--crestFoamHeight", crestFoamHeight));
 
+    double oceanSurfaceHeight = 0.0f;
+    while (arguments.read("--oceanSurfaceHeight", oceanSurfaceHeight));
+
+    bool testCollision = false;
+    if (arguments.read("--testCollision")) testCollision = true;
+
+    bool disableShaders = false;
+    if (arguments.read("--disableShaders")) disableShaders = true;
+
     osg::ref_ptr<osg::Node> loadedModel = osgDB::readNodeFiles(arguments);
 
     // any option left unread are converted into errors to write out later.
@@ -742,12 +765,35 @@ int main(int argc, char *argv[])
     viewer.addEventHandler( new osgViewer::StatsHandler );
     osg::ref_ptr<TextHUD> hud = new TextHUD;
 
+    osgOcean::ShaderManager::instance().enableShaders(!disableShaders);
     osg::ref_ptr<SceneModel> scene = new SceneModel(windDirection, windSpeed, depth, reflectionDamping, scale, isChoppy, choppyFactor, crestFoamHeight);
+    
+    if (disableShaders)
+    {
+        // Disable all special effects that depend on shaders.
+
+        // These depend on fullscreen RTT passes and shaders to do their effects.
+        scene->getOceanScene()->enableDistortion(false);
+        scene->getOceanScene()->enableGlare(false);
+        scene->getOceanScene()->enableUnderwaterDOF(false);
+
+        // These are only implemented in the shader, with no fixed-pipeline equivalent
+        scene->getOceanScene()->enableUnderwaterScattering(false);
+        // For these two, we might be able to use projective texturing so it would
+        // work on the fixed pipeline?
+        scene->getOceanScene()->enableReflections(false);
+        scene->getOceanScene()->enableRefractions(false);
+        scene->getOceanScene()->enableGodRays(false);  // Could be done in fixed pipeline?
+        scene->getOceanScene()->enableSilt(false);     // Could be done in fixed pipeline?
+    }
+
+    scene->getOceanScene()->setOceanSurfaceHeight(oceanSurfaceHeight);
     viewer.addEventHandler(scene->getOceanSceneEventHandler());
     viewer.addEventHandler(scene->getOceanSurface()->getEventHandler());
 
     viewer.addEventHandler( new SceneEventHandler(scene.get(), hud.get(), viewer ) );
     viewer.addEventHandler( new osgViewer::HelpHandler );
+    viewer.getCamera()->setName("MainCamera");
 
     osg::Group* root = new osg::Group;
     root->addChild( scene->getScene() );
@@ -756,9 +802,24 @@ int main(int argc, char *argv[])
     if (loadedModel.valid())
     {
         loadedModel->setNodeMask( scene->getOceanScene()->getNormalSceneMask() | 
-                                scene->getOceanScene()->getReflectedSceneMask() | 
-                                scene->getOceanScene()->getRefractedSceneMask() );
+                                  scene->getOceanScene()->getReflectedSceneMask() | 
+                                  scene->getOceanScene()->getRefractedSceneMask() );
         scene->getOceanScene()->addChild(loadedModel.get());
+    }
+
+    if (testCollision)
+    {
+        osg::ref_ptr<osg::Node> boat = osgDB::readNodeFile("resources/boat.3ds");
+        boat->setNodeMask( scene->getOceanScene()->getNormalSceneMask() | 
+                           scene->getOceanScene()->getReflectedSceneMask() | 
+                           scene->getOceanScene()->getRefractedSceneMask() );
+
+        osg::ref_ptr<osg::MatrixTransform> boatTransform = new osg::MatrixTransform;
+        boatTransform->addChild(boat.get());
+        boatTransform->setMatrix(osg::Matrix::translate(osg::Vec3f(0.0f, 160.0f,0.0f)));
+        boatTransform->setUpdateCallback( new BoatPositionCallback(scene->getOceanScene()) );
+
+        scene->getOceanScene()->addChild(boatTransform.get());   
     }
 
     viewer.setSceneData( root );

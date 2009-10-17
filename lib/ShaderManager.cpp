@@ -17,7 +17,7 @@
 
 #include <osgOcean/ShaderManager>
 #include <osgDB/ReadFile>
-#include <osgDB/fileutils>
+#include <osgDB/FileUtils>
 #include <osg/Version>
 
 using namespace osgOcean;
@@ -60,6 +60,8 @@ osg::Shader* readShader(const std::string& filename)
 }
 
 ShaderManager::ShaderManager()
+    : _globalDefinitions()
+    , _shadersEnabled(true)
 {
 }
 
@@ -90,6 +92,9 @@ osg::Program* ShaderManager::createProgram( const std::string& name,
                                             const std::string& fragmentSrc, 
                                             bool loadFromFiles )
 {
+    if (!_shadersEnabled)
+        return new osg::Program;
+
     osg::ref_ptr<osg::Shader> vShader = 0;
     osg::ref_ptr<osg::Shader> fShader = 0;
 
@@ -125,13 +130,13 @@ osg::Program* ShaderManager::createProgram( const std::string& name,
     program->setName(name);
 
     std::string globalDefinitionsList = buildGlobalDefinitionsList(name);
-    if (vShader)
+    if (vShader.valid())
     {
         vShader->setShaderSource(globalDefinitionsList + vShader->getShaderSource());
         vShader->setName(name+"_vertex_shader");
         program->addShader( vShader.get() );
     }
-    if (fShader)
+    if (fShader.valid())
     {
         fShader->setShaderSource(globalDefinitionsList + fShader->getShaderSource());
         fShader->setName(name+"_fragment_shader");
@@ -149,7 +154,6 @@ std::string ShaderManager::buildGlobalDefinitionsList(const std::string& name)
     {
         list += "// " + name + "\n";
     }
-   // list += "#version 120\n";
 
     for (GlobalDefinitions::const_iterator it = _globalDefinitions.begin();
          it != _globalDefinitions.end(); ++it)

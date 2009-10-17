@@ -4,7 +4,6 @@ lmkOSG.set_name ("osgOceanApp", {DMZ_USE_FFTW3 = true})
 lmk.set_type "exe"
 
 lmk.add_files {
-   "Cylinder.cpp",
    "SkyDome.cpp",
    "SphereSegment.cpp",
    "application.cpp",

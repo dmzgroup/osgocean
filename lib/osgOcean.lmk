@@ -5,6 +5,7 @@ lmkOSG.set_name ("osgOcean", {DMZ_USE_FFTW3 = true})
 lmk.set_type "shared"
 
 lmk.add_files ({
+   "osgOcean/Cylinder",
    "osgOcean/DistortionSurface",
    "osgOcean/DynamicShader",
    "osgOcean/Export",
@@ -24,6 +25,7 @@ lmk.add_files ({
 }, {src = "h",})
 
 lmk.add_files {
+   "Cylinder.cpp",
    "DistortionSurface.cpp",
    "DynamicShader.cpp",
    "FFTOceanSurface.cpp",
